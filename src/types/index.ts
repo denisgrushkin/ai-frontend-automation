@@ -1,3 +1,14 @@
+export interface PromptTask {
+  id: string;
+  prompt: string;
+  figmaLinks?: string[];
+  requirements?: string[];
+  acceptanceCriteria?: string[];
+  priority?: string;
+  framework?: string;
+  styling?: string;
+}
+
 export interface JiraTask {
   id: string;
   key: string;
@@ -65,6 +76,7 @@ export interface AgentTask {
 }
 
 export enum AgentTaskType {
+  ANALYZE_PROMPT = 'ANALYZE_PROMPT',
   ANALYZE_JIRA_TASK = 'ANALYZE_JIRA_TASK',
   EXTRACT_FIGMA_DESIGN = 'EXTRACT_FIGMA_DESIGN',
   GENERATE_CODE = 'GENERATE_CODE',
@@ -102,6 +114,7 @@ export interface AgentConfig {
 
 export enum AgentType {
   MAIN_COORDINATOR = 'MAIN_COORDINATOR',
+  PROMPT_ANALYZER = 'PROMPT_ANALYZER',
   JIRA_ANALYZER = 'JIRA_ANALYZER',
   FIGMA_DESIGNER = 'FIGMA_DESIGNER',
   CODE_GENERATOR = 'CODE_GENERATOR',

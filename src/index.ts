@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { MainCoordinatorAgent } from './agents/MainCoordinatorAgent';
+import { PromptAnalyzerAgent } from './agents/PromptAnalyzerAgent';
 import { JiraAnalyzerAgent } from './agents/JiraAnalyzerAgent';
 import { FigmaDesignerAgent } from './agents/FigmaDesignerAgent';
 import { QATesterAgent } from './agents/QATesterAgent';
@@ -13,14 +14,15 @@ dotenv.config();
  * AI Frontend Development Automation System
  * 
  * This system coordinates multiple AI agents to automate frontend development:
- * 1. Jira Analyzer Agent - Analyzes Jira tasks and extracts requirements
- * 2. Figma Designer Agent - Extracts design specifications from Figma
- * 3. Code Generator Agent - Generates frontend code based on requirements
- * 4. GitHub Manager Agent - Creates pull requests and manages version control
- * 5. QA Tester Agent - Generates and runs tests
+ * 1. Prompt Analyzer Agent - Analyzes text prompts and extracts requirements (primary)
+ * 2. Jira Analyzer Agent - Analyzes Jira tasks and extracts requirements (optional)
+ * 3. Figma Designer Agent - Extracts design specifications from Figma
+ * 4. Code Generator Agent - Generates frontend code based on requirements
+ * 5. QA Tester Agent - Compares generated layout with Figma designs
+ * 6. GitHub Manager Agent - Creates pull requests and manages version control
  */
 export class AIFrontendAutomationSystem {
-  private coordinatorAgent: MainCoordinatorAgent;
+  private coordinatorAgent!: MainCoordinatorAgent;
   private logger: winston.Logger;
   private isInitialized: boolean = false;
 
@@ -85,7 +87,26 @@ export class AIFrontendAutomationSystem {
   }
 
   /**
-   * Process Jira tasks and execute full automation workflow
+   * Process text prompts and execute full automation workflow (primary method)
+   */
+  async processPrompts(prompts: string[]): Promise<void> {
+    if (!this.isInitialized) {
+      throw new Error('System not initialized. Call initialize() first.');
+    }
+
+    this.logger.info(`Processing ${prompts.length} prompts`);
+
+    try {
+      await this.coordinatorAgent.processPrompts(prompts);
+      this.logger.info('All prompts processed successfully');
+    } catch (error) {
+      this.logger.error('Failed to process prompts', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Process Jira tasks and execute full automation workflow (optional integration)
    */
   async processJiraTasks(taskNumbers: string[]): Promise<void> {
     if (!this.isInitialized) {
@@ -136,10 +157,16 @@ export class AIFrontendAutomationSystem {
    */
   private validateEnvironment(): void {
     const requiredVars = [
-      'OPENAI_API_KEY',
+      'OPENAI_API_KEY'
+    ];
+
+    const optionalJiraVars = [
       'JIRA_HOST',
       'JIRA_USERNAME', 
-      'JIRA_API_TOKEN',
+      'JIRA_API_TOKEN'
+    ];
+
+    const optionalVars = [
       'FIGMA_ACCESS_TOKEN',
       'GITHUB_TOKEN'
     ];
@@ -149,6 +176,21 @@ export class AIFrontendAutomationSystem {
     if (missingVars.length > 0) {
       throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
     }
+
+    // Check optional Jira integration
+    const hasJiraVars = optionalJiraVars.every(varName => process.env[varName]);
+    if (!hasJiraVars) {
+      this.logger.warn('Jira integration disabled - missing Jira environment variables', {
+        missing: optionalJiraVars.filter(varName => !process.env[varName])
+      });
+    }
+
+    // Check other optional integrations
+    optionalVars.forEach(varName => {
+      if (!process.env[varName]) {
+        this.logger.warn(`Optional integration disabled - missing ${varName}`);
+      }
+    });
   }
 
   /**
@@ -162,20 +204,30 @@ export class AIFrontendAutomationSystem {
       timeout: parseInt(process.env.TASK_TIMEOUT_MINUTES || '30') * 60 * 1000
     };
 
-    // Initialize Jira Analyzer Agent
-    const jiraAgent = new JiraAnalyzerAgent(
-      {
-        ...baseAgentConfig,
-        id: 'jira-analyzer',
-        name: 'Jira Analyzer Agent'
-      },
-      {
-        host: process.env.JIRA_HOST!,
-        username: process.env.JIRA_USERNAME!,
-        apiToken: process.env.JIRA_API_TOKEN!,
-        projectKey: process.env.JIRA_PROJECT_KEY!
-      }
-    );
+    // Initialize Prompt Analyzer Agent (primary)
+    const promptAgent = new PromptAnalyzerAgent({
+      ...baseAgentConfig,
+      id: 'prompt-analyzer',
+      name: 'Prompt Analyzer Agent'
+    });
+
+    // Initialize Jira Analyzer Agent (optional)
+    let jiraAgent: JiraAnalyzerAgent | null = null;
+    if (process.env.JIRA_HOST && process.env.JIRA_USERNAME && process.env.JIRA_API_TOKEN) {
+      jiraAgent = new JiraAnalyzerAgent(
+        {
+          ...baseAgentConfig,
+          id: 'jira-analyzer',
+          name: 'Jira Analyzer Agent'
+        },
+        {
+          host: process.env.JIRA_HOST,
+          username: process.env.JIRA_USERNAME,
+          apiToken: process.env.JIRA_API_TOKEN,
+          projectKey: process.env.JIRA_PROJECT_KEY || 'PROJ'
+        }
+      );
+    }
 
     // Initialize Figma Designer Agent
     const figmaAgent = new FigmaDesignerAgent(
@@ -198,7 +250,10 @@ export class AIFrontendAutomationSystem {
     });
 
     // Register agents with coordinator
-    this.coordinatorAgent.registerAgent(jiraAgent);
+    this.coordinatorAgent.registerAgent(promptAgent);
+    if (jiraAgent) {
+      this.coordinatorAgent.registerAgent(jiraAgent);
+    }
     this.coordinatorAgent.registerAgent(figmaAgent);
     this.coordinatorAgent.registerAgent(qaAgent);
 
@@ -238,27 +293,35 @@ async function main() {
 AI Frontend Development Automation System
 
 Usage:
-  npm run dev <task1> [task2] [task3] ...
+  npm run dev "<prompt>"                     # Process text prompt (primary mode)
+  npm run dev --jira <task1> [task2] ...     # Process Jira tasks (optional)
 
 Examples:
-  npm run dev DEV-123
-  npm run dev DEV-123 DEV-124 DEV-125
+  npm run dev "Create a React login form with validation"
+  npm run dev "Build a responsive navbar with dark mode toggle"
+  npm run dev "Create user dashboard with charts https://figma.com/file/..."
+  npm run dev --jira DEV-123 DEV-124
 
-Environment Variables Required:
-  - OPENAI_API_KEY: OpenAI API key
-  - JIRA_HOST: Jira domain (e.g., company.atlassian.net)
-  - JIRA_USERNAME: Jira username
-  - JIRA_API_TOKEN: Jira API token
-  - FIGMA_ACCESS_TOKEN: Figma personal access token
-  - GITHUB_TOKEN: GitHub personal access token
+Environment Variables:
+  Required:
+    - OPENAI_API_KEY: OpenAI API key
 
-Optional Environment Variables:
-  - MAIN_AGENT_MODEL: AI model for main coordinator (default: gpt-4-turbo-preview)
-  - SPECIALIZED_AGENT_MODEL: AI model for specialized agents (default: gpt-3.5-turbo)
-  - MAX_PARALLEL_AGENTS: Maximum parallel agents (default: 3)
-  - TASK_TIMEOUT_MINUTES: Task timeout in minutes (default: 30)
-  - LOG_LEVEL: Logging level (default: info)
-  - LOG_FILE: Log file path (default: logs/system.log)
+  Optional Integrations:
+    - FIGMA_ACCESS_TOKEN: Figma personal access token
+    - GITHUB_TOKEN: GitHub personal access token
+    
+  Optional Jira Integration:
+    - JIRA_HOST: Jira domain (e.g., company.atlassian.net)
+    - JIRA_USERNAME: Jira username
+    - JIRA_API_TOKEN: Jira API token
+
+  Configuration:
+    - MAIN_AGENT_MODEL: AI model for main coordinator (default: gpt-4-turbo-preview)
+    - SPECIALIZED_AGENT_MODEL: AI model for specialized agents (default: gpt-3.5-turbo)
+    - MAX_PARALLEL_AGENTS: Maximum parallel agents (default: 3)
+    - TASK_TIMEOUT_MINUTES: Task timeout in minutes (default: 30)
+    - LOG_LEVEL: Logging level (default: info)
+    - LOG_FILE: Log file path (default: logs/system.log)
     `);
     process.exit(1);
   }
@@ -269,9 +332,20 @@ Optional Environment Variables:
     // Initialize system
     await system.initialize();
 
-    // Process Jira tasks
-    const taskNumbers = args;
-    await system.processJiraTasks(taskNumbers);
+    // Check if using Jira mode
+    if (args[0] === '--jira') {
+      const taskNumbers = args.slice(1);
+      if (taskNumbers.length === 0) {
+        console.log('❌ Error: Please provide Jira task numbers after --jira flag');
+        process.exit(1);
+      }
+      console.log(`🎯 Processing ${taskNumbers.length} Jira tasks: ${taskNumbers.join(', ')}`);
+      await system.processJiraTasks(taskNumbers);
+    } else {
+      // Default: treat arguments as prompts
+      console.log(`🚀 Processing ${args.length} prompts...`);
+      await system.processPrompts(args);
+    }
 
     console.log('✅ All tasks completed successfully!');
   } catch (error) {

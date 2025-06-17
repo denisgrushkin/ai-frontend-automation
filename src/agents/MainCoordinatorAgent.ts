@@ -46,14 +46,32 @@ export class MainCoordinatorAgent extends BaseAgent {
   }
 
   /**
-   * Process Jira task numbers and coordinate the full development workflow
+   * Process text prompts and coordinate the full development workflow (primary method)
+   */
+  public async processPrompts(prompts: string[]): Promise<void> {
+    this.logger.info(`Processing ${prompts.length} prompts`);
+
+    for (const prompt of prompts) {
+      try {
+        await this.executePromptWorkflow(prompt);
+      } catch (error) {
+        this.logger.error(`Failed to process prompt`, {
+          error: error instanceof Error ? error.message : String(error),
+          promptPreview: prompt.substring(0, 100)
+        });
+      }
+    }
+  }
+
+  /**
+   * Process Jira task numbers and coordinate the full development workflow (optional integration)
    */
   public async processJiraTasks(taskNumbers: string[]): Promise<void> {
     this.logger.info(`Processing ${taskNumbers.length} Jira tasks`, { taskNumbers });
 
     for (const taskNumber of taskNumbers) {
       try {
-        await this.executeFullWorkflow(taskNumber);
+        await this.executeJiraWorkflow(taskNumber);
       } catch (error) {
         this.logger.error(`Failed to process Jira task ${taskNumber}`, {
           error: error instanceof Error ? error.message : String(error)
@@ -63,9 +81,87 @@ export class MainCoordinatorAgent extends BaseAgent {
   }
 
   /**
+   * Execute the full development workflow for a text prompt
+   */
+  private async executePromptWorkflow(prompt: string): Promise<void> {
+    const workflowId = uuidv4();
+    this.logger.info(`Starting prompt workflow`, { workflowId, promptPreview: prompt.substring(0, 100) });
+
+    // Define workflow steps for prompt analysis
+    const workflowSteps: WorkflowStep[] = [
+      {
+        id: uuidv4(),
+        name: 'Analyze Prompt',
+        agentType: AgentType.PROMPT_ANALYZER,
+        dependencies: [],
+        input: { prompt },
+        status: TaskStatus.PENDING,
+        retryCount: 0
+      },
+      {
+        id: uuidv4(),
+        name: 'Extract Figma Design',
+        agentType: AgentType.FIGMA_DESIGNER,
+        dependencies: ['Analyze Prompt'],
+        input: {},
+        status: TaskStatus.PENDING,
+        retryCount: 0
+      },
+      {
+        id: uuidv4(),
+        name: 'Generate Code',
+        agentType: AgentType.CODE_GENERATOR,
+        dependencies: ['Analyze Prompt', 'Extract Figma Design'],
+        input: {},
+        status: TaskStatus.PENDING,
+        retryCount: 0
+      },
+      {
+        id: uuidv4(),
+        name: 'Visual QA Testing',
+        agentType: AgentType.QA_TESTER,
+        dependencies: ['Generate Code', 'Extract Figma Design'],
+        input: {},
+        status: TaskStatus.PENDING,
+        retryCount: 0
+      },
+      {
+        id: uuidv4(),
+        name: 'Create Tests',
+        agentType: AgentType.CODE_GENERATOR,
+        dependencies: ['Visual QA Testing'],
+        input: {},
+        status: TaskStatus.PENDING,
+        retryCount: 0
+      },
+      {
+        id: uuidv4(),
+        name: 'Create Pull Request',
+        agentType: AgentType.GITHUB_MANAGER,
+        dependencies: ['Generate Code', 'Create Tests', 'Visual QA Testing'],
+        input: {},
+        status: TaskStatus.PENDING,
+        retryCount: 0
+      }
+    ];
+
+    this.activeWorkflows.set(workflowId, workflowSteps);
+
+    try {
+      await this.executeWorkflowSteps(workflowId, workflowSteps);
+      this.logger.info(`Prompt workflow completed successfully`, { workflowId });
+    } catch (error) {
+      this.logger.error(`Prompt workflow failed`, { workflowId, error });
+      throw error;
+    } finally {
+      this.activeWorkflows.delete(workflowId);
+    }
+  }
+
+  /**
    * Execute the full development workflow for a single Jira task
    */
-  private async executeFullWorkflow(taskNumber: string): Promise<void> {
+  private async executeJiraWorkflow(taskNumber: string): Promise<void> {
     const workflowId = uuidv4();
     this.logger.info(`Starting workflow for task ${taskNumber}`, { workflowId });
 
@@ -245,12 +341,16 @@ export class MainCoordinatorAgent extends BaseAgent {
    */
   private mapStepToTaskType(stepName: string): AgentTaskType {
     switch (stepName) {
+      case 'Analyze Prompt':
+        return AgentTaskType.ANALYZE_PROMPT;
       case 'Analyze Jira Task':
         return AgentTaskType.ANALYZE_JIRA_TASK;
       case 'Extract Figma Design':
         return AgentTaskType.EXTRACT_FIGMA_DESIGN;
       case 'Generate Code':
         return AgentTaskType.GENERATE_CODE;
+      case 'Visual QA Testing':
+        return AgentTaskType.CREATE_TESTS;
       case 'Create Tests':
         return AgentTaskType.CREATE_TESTS;
       case 'Create Pull Request':
