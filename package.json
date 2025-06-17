@@ -9,37 +9,48 @@
     "dev": "ts-node src/index.ts",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "demo:code-display": "ts-node src/demo/codeDisplayDemo.ts"
   },
-  "keywords": ["ai", "agents", "frontend", "automation", "jira", "figma", "github"],
+  "keywords": [
+    "ai",
+    "agents",
+    "frontend",
+    "automation",
+    "jira",
+    "figma",
+    "github"
+  ],
   "author": "Frontend AI Team",
   "license": "MIT",
   "dependencies": {
-    "langchain": "^0.2.0",
+    "@langchain/anthropic": "^0.2.0",
     "@langchain/core": "^0.2.0",
     "@langchain/openai": "^0.2.0",
-    "@langchain/anthropic": "^0.2.0",
-    "axios": "^1.6.0",
-    "dotenv": "^16.3.0",
-    "winston": "^3.11.0",
-    "zod": "^3.22.0",
-    "uuid": "^9.0.0",
     "@octokit/rest": "^20.0.0",
-    "jira-client": "^8.2.0",
-    "figma-api": "^1.12.0",
-    "openai": "^4.0.0",
+    "@types/colors": "^1.2.4",
     "anthropic": "^0.24.0",
-    "puppeteer": "^22.0.0",
+    "axios": "^1.6.0",
+    "colors": "^1.4.0",
+    "dotenv": "^16.3.0",
+    "figma-api": "^1.12.0",
+    "jira-client": "^8.2.0",
+    "langchain": "^0.2.0",
+    "openai": "^4.0.0",
     "pixelmatch": "^5.3.0",
-    "pngjs": "^7.0.0"
+    "pngjs": "^7.0.0",
+    "puppeteer": "^22.0.0",
+    "uuid": "^9.0.0",
+    "winston": "^3.11.0",
+    "zod": "^3.22.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/uuid": "^9.0.0",
     "@types/jest": "^29.0.0",
-    "@types/puppeteer": "^5.4.0",
+    "@types/node": "^20.0.0",
     "@types/pixelmatch": "^5.2.0",
     "@types/pngjs": "^6.0.0",
+    "@types/puppeteer": "^5.4.0",
+    "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.0.0",
@@ -48,4 +59,4 @@
     "ts-node": "^10.9.0",
     "typescript": "^5.0.0"
   }
-} 
+}

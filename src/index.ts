@@ -6,6 +6,7 @@ import { FigmaDesignerAgent } from './agents/FigmaDesignerAgent';
 import { QATesterAgent } from './agents/QATesterAgent';
 import { AgentType } from './types';
 import winston from 'winston';
+import { CodeDisplayer } from './utils/CodeDisplayer';
 
 // Load environment variables
 dotenv.config();

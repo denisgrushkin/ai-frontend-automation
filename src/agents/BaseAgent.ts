@@ -9,8 +9,11 @@ import {
   AgentTask, 
   TaskStatus, 
   AgentType,
-  AgentCapability 
+  AgentCapability,
+  GeneratedFile,
+  CodeGenerationResult
 } from '../types';
+import { CodeDisplayer, CodeDisplayOptions } from '../utils/CodeDisplayer';
 
 export abstract class BaseAgent {
   protected id: string;
@@ -185,6 +188,56 @@ export abstract class BaseAgent {
 
     const response = await this.model.invoke(messages);
     return response.content.toString();
+  }
+
+  /**
+   * Display generated code in console with formatting
+   */
+  protected displayGeneratedCode(
+    result: CodeGenerationResult | GeneratedFile[],
+    options?: CodeDisplayOptions
+  ): void {
+    this.logger.info(`Displaying generated code for agent ${this.name}`);
+
+    if (Array.isArray(result)) {
+      CodeDisplayer.displayGeneratedFiles(result, options);
+    } else if ('files' in result) {
+      const allFiles = [...result.files, ...result.tests];
+      CodeDisplayer.displayGeneratedFiles(allFiles, options);
+      
+      if (result.documentation) {
+        CodeDisplayer.displayWithTitle(
+          'Documentation',
+          result.documentation,
+          'markdown',
+          options
+        );
+      }
+    }
+  }
+
+  /**
+   * Display single code fragment with title
+   */
+  protected displayCodeFragment(
+    title: string,
+    code: string,
+    language?: string,
+    options?: CodeDisplayOptions
+  ): void {
+    this.logger.info(`Displaying code fragment: ${title} for agent ${this.name}`);
+    CodeDisplayer.displayWithTitle(title, code, language, options);
+  }
+
+  /**
+   * Display multiple code fragments
+   */
+  protected displayCodeFragments(
+    fragments: Array<{ title: string; code: string; language?: string }>,
+    options?: CodeDisplayOptions
+  ): void {
+    this.logger.info(`Displaying ${fragments.length} code fragments for agent ${this.name}`);
+    CodeDisplayer.displayCodeFragments(fragments, options);
   }
 
   /**
